@@ -1,0 +1,10 @@
+{
+    "cheese": ["paneer", "mozzarella", "parmesan", "ricotta", "cream cheese", "mascarpone", "labneh"],
+    "egg": ["aioli", "mayo", "mayonnaise", "hollandaise"],
+    "sesame": ["tahini", "gomasio", "benne", "gingelly"],
+    "soy": ["soya", "shoyu"],
+    "fish sauce": ["nam pla"],
+    "bread": ["panko", "breadcrumbs"],
+    "peanut": ["satay", "peanut sauce", "peanut butter"]
+  }
+  

@@ -1,0 +1,12 @@
+{
+    "Gluten": ["breaded", "batter", "tempura", "seitan", "wheat flour", "roux", "noodles"],
+    "Dairy": ["buttermilk", "whey", "cream cheese", "condensed milk", "evaporated milk", "labneh"],
+    "Eggs": ["meringue", "custard", "hollandaise", "carbonara"],
+    "Soy": ["soy lecithin", "miso", "tempeh"],
+    "Peanuts": ["peanut butter", "peanut sauce", "pad thai"],
+    "Tree Nuts": ["praline", "marzipan", "nutella", "gianduja", "pesto"],
+    "Fish": ["fish sauce", "nam pla", "bonito"],
+    "Shellfish": ["shrimp paste", "belacan", "scampi", "langoustine"],
+    "Sesame": ["gomasio", "benne", "gingelly"]
+  }
+  
