@@ -1,80 +1,109 @@
-'use client'
-import { useState } from 'react'
-import { getToken } from '@/lib/auth'
-import Link from 'next/link'
+"use client";
+import { useState } from "react";
+import { api } from "@/lib/api";
+import { authHeader } from "@/lib/auth";
 
 export default function UploadPage() {
-  const token = getToken()
-  const [file, setFile] = useState(null)
-  const [fileId, setFileId] = useState(null)
-  const [preview, setPreview] = useState([])
-  const [issues, setIssues] = useState([])
-  const [err, setErr] = useState('')
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [fileId, setFileId] = useState(null);
+  const [msg, setMsg] = useState("");
 
-  const upload = async (endpoint) => {
-    setErr('')
-    const fd = new FormData()
-    fd.append('file', file)
+  async function upload() {
+    setMsg("");
+    if (!file) return setMsg("Choose a CSV first.");
+
+    const fd = new FormData();
+    fd.append("file", file);
+
     try {
-      const url = (process.env.NEXT_PUBLIC_API_BASE || '') + endpoint
-      const res = await fetch(url, { method:'POST', headers: { Authorization:`Bearer ${token}` }, body: fd })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.detail || 'Upload failed')
-      setFileId(json.fileId || null)
-      setPreview(json.preview || [])
-      setIssues(json.issues || [])
-    } catch (e) { setErr(e.message) }
+      const res = await api("/api/ingest/csv", {
+        method: "POST",
+        headers: { ...authHeader() }, // MUST be a restaurant token
+        formData: fd,
+      });
+      setPreview(res.preview || []);
+      setFileId(res.fileId);
+      setMsg(`Uploaded. fileId=${res.fileId}`);
+    } catch (e) {
+      console.error("Upload failed:", e);
+      setMsg(`Upload failed: ${e.message}. 
+Hint: Are you logged in as a restaurant? Is CORS allowing http://localhost:5173?`);
+    }
   }
 
-  const commit = async () => {
-    if (!fileId) { alert('No preview to commit'); return }
+  async function commit() {
+    setMsg("");
+    if (!fileId) return setMsg("Nothing to commit. Upload and preview first.");
     try {
-      const url = (process.env.NEXT_PUBLIC_API_BASE || '') + `/api/ingest/commit?fileId=${fileId}`
-      const res = await fetch(url, { method:'POST', headers: { Authorization:`Bearer ${token}` }})
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.detail || 'Commit failed')
-      alert(`Committed ${json.created} items`)
-      setPreview([]); setIssues([]); setFile(null); setFileId(null)
-    } catch (e) { alert(e.message) }
+      const res = await api(`/api/ingest/commit?fileId=${fileId}`, {
+        method: "POST",
+        headers: { ...authHeader() },
+      });
+      setMsg(`Commit complete. Created ${res.created} items.`);
+    } catch (e) {
+      console.error("Commit failed:", e);
+      setMsg(`Commit failed: ${e.message}`);
+    }
   }
-
-  if (!token) return <p>Please <Link href="/login">login</Link> as a restaurant.</p>
 
   return (
-    <div>
-      <h2>Bulk Upload (Restaurant)</h2>
-      {err && <div style={{color:'red'}}>{err}</div>}
-      <input type="file" accept=".csv,.pdf" onChange={e=>setFile(e.target.files?.[0] || null)} />
-      <div style={{display:'flex', gap:8}}>
-        <button disabled={!file} onClick={()=>upload('/api/ingest/csv')}>Preview CSV</button>
-        <button disabled={!file} onClick={()=>upload('/api/ingest/pdf')}>Preview PDF</button>
+    <section className="card" aria-labelledby="upload-h">
+      <h2 id="upload-h" className="section-title">Upload Menu (CSV)</h2>
+
+      <div style={{display:"grid", gridTemplateColumns:"1fr auto auto", gap:8, alignItems:"end"}}>
+        <div>
+          <label htmlFor="csv" className="small">CSV file</label>
+          <input
+            id="csv"
+            className="file"
+            type="file"
+            accept=".csv"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
+        </div>
+        <button className="btn" onClick={upload}>Preview</button>
+        <button className="btn" onClick={commit} disabled={!fileId} aria-disabled={!fileId}>
+          Commit
+        </button>
       </div>
 
-      {issues.length > 0 && (
-        <div style={{background:'#fff5e6', padding:8, margin:'12px 0'}}>
-          <b>Issues:</b>
-          <ul>{issues.map((i,k)=><li key={k}>{i}</li>)}</ul>
-        </div>
-      )}
-
-      {preview.length > 0 && (
+      {preview && (
         <>
-          <table>
-            <thead><tr><th>Name</th><th>Description</th><th>Price</th><th>Auto-predicted allergens</th></tr></thead>
+          <h3 className="section-title" style={{marginTop:16}}>Preview</h3>
+          <table className="table" role="table" aria-label="Parsed menu preview">
+            <thead>
+              <tr>
+                <th>Item</th><th>Description</th><th>Price</th><th>Predicted Allergens</th>
+              </tr>
+            </thead>
             <tbody>
-              {preview.map((r,idx)=>(
-                <tr key={idx}>
+              {preview.map((r, i) => (
+                <tr key={i}>
                   <td>{r.item_name}</td>
-                  <td>{r.description}</td>
+                  <td className="small">{r.description}</td>
                   <td>{r.price}</td>
-                  <td>{(r.predicted_allergens||[]).join(', ') || '—'}</td>
+                  <td>
+                    {(r.predicted_allergens || []).map(a => (
+                      <span key={a} className="badge">{a}</span>
+                    ))}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <button onClick={commit} style={{ marginTop: 12 }}>Commit</button>
         </>
       )}
-    </div>
-  )
+
+      {msg && (
+        <div role="status" aria-live="polite" className="alert success" style={{marginTop:12}}>
+          {msg}
+        </div>
+      )}
+
+      <p className="small" style={{marginTop:12}}>
+        Note: Only <strong>restaurant</strong>-role users can upload and commit.
+      </p>
+    </section>
+  );
 }

@@ -1,22 +1,11 @@
-'use client'
-import Link from 'next/link'
-import { getToken, clearToken } from '@/lib/auth'
-import { useEffect, useState } from 'react'
-
-export default function HomePage() {
-  const [authed, setAuthed] = useState(false)
-  useEffect(() => { setAuthed(!!getToken()) }, [])
+export default function Page() {
   return (
-    <div>
-      <nav>
-        {!authed && <Link href="/login"><button>Login</button></Link>}
-        {!authed && <Link href="/register"><button>Register</button></Link>}
-        {authed && <Link href="/menu"><button>Menu</button></Link>}
-        {authed && <Link href="/profile"><button>My Allergies</button></Link>}
-        {authed && <Link href="/upload"><button>Bulk Upload</button></Link>}
-        {authed && <button onClick={() => { clearToken(); location.href='/' }}>Logout</button>}
-      </nav>
-      <p>Welcome! Please log in or register to continue.</p>
-    </div>
-  )
+    <section className="card" aria-labelledby="welcome-h">
+      <h2 id="welcome-h" className="section-title">Welcome</h2>
+      <p className="small">
+        Use the navigation to register or log in, set your allergy profile, view menus with the
+        <em> “Safe for me” </em> filter, or upload CSV as a restaurant.
+      </p>
+    </section>
+  );
 }

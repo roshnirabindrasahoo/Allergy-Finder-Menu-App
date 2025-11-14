@@ -1,5 +1,10 @@
-from pydantic import BaseModel, Field
+from __future__ import annotations
+
+# backend/app/schemas.py
 from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
 
 class TokenOut(BaseModel):
     token: str
@@ -46,3 +51,13 @@ class IngestCommitIn(BaseModel):
 class SuggestIn(BaseModel):
     item_name: Optional[str] = ""
     description: Optional[str] = ""
+
+
+
+# ... your other schemas ...
+
+class ParsedRow(BaseModel):
+    item_name: str = Field(..., min_length=1)
+    description: Optional[str] = None
+    price: Optional[float] = None
+    predicted_allergens: List[str] = []

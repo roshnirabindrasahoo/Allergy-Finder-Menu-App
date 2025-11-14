@@ -1,0 +1,8 @@
+{
+  "/upload/page": "app/upload/page.js",
+  "/manage/page": "app/manage/page.js",
+  "/login/page": "app/login/page.js",
+  "/menu/page": "app/menu/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/page": "app/page.js"
+}

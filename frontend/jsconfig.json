@@ -1,7 +1,9 @@
+// jsconfig.json (at the project root of the frontend)
 {
-    "compilerOptions": {
-      "baseUrl": ".",
-      "paths": { "@/*": ["*"] }
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
     }
   }
-  
+}

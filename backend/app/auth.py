@@ -7,6 +7,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "dev_secret_change_me")
 ALGO = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
 _auth = HTTPBearer()
+_optional_auth = HTTPBearer(auto_error=False)
 
 def hash_password(pw: str) -> str:
     return bcrypt.hash(pw)
@@ -22,6 +23,16 @@ def get_current_user(creds: HTTPAuthorizationCredentials = Depends(_auth)):
     token = creds.credentials
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGO])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+def get_optional_user(
+    creds: HTTPAuthorizationCredentials | None = Depends(_optional_auth),
+):
+    if not creds:
+        return None
+    try:
+        return jwt.decode(creds.credentials, SECRET_KEY, algorithms=[ALGO])
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 

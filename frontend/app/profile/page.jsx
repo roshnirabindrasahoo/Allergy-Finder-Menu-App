@@ -1,48 +1,72 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { api } from '@/lib/api'
-import { getToken } from '@/lib/auth'
-import Link from 'next/link'
+// app/profile/page.jsx
+"use client";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { authHeader } from "@/lib/auth";
 
 export default function ProfilePage() {
-  const [allergens, setAllergens] = useState([])
-  const [sel, setSel] = useState(new Set())
-  const [msg, setMsg] = useState('')
-  const token = getToken()
+  const [allergens, setAllergens] = useState([]);
+  const [myIds, setMyIds] = useState([]);
+  const [msg, setMsg] = useState("");
 
-  useEffect(() => {
-    if (!token) return
-    api('/api/allergens', { token }).then(setAllergens)
-  }, [token])
-
-  const toggle = (id) => {
-    const s = new Set(sel)
-    s.has(id) ? s.delete(id) : s.add(id)
-    setSel(s)
+  async function load() {
+    setMsg("");
+    try {
+      const [all, mine] = await Promise.all([
+        api("/api/allergens"),
+        api("/api/allergens/me", { headers: { ...authHeader() } }),
+      ]);
+      setAllergens(all || []);
+      setMyIds(mine?.allergyIds || []);
+    } catch (e) {
+      setMsg(`Load failed: ${e.message}. (Are you logged in?)`);
+    }
   }
 
-  const save = async () => {
-    await api('/api/allergens/me', { method:'PUT', body:{ allergyIds:[...sel] }, token })
-    setMsg('Saved!'); setTimeout(()=>setMsg(''), 1200)
+  useEffect(() => { load(); }, []);
+
+  function toggle(id) {
+    setMyIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
 
-  if (!token) return <p>Please <Link href="/login">login</Link>.</p>
+  async function save() {
+    setMsg("");
+    try {
+      await api("/api/allergens/me", {
+        method: "PUT",
+        headers: { ...authHeader() },
+        body: { allergyIds: myIds },
+      });
+      setMsg("Saved your allergy preferences.");
+    } catch (e) {
+      setMsg(`Save failed: ${e.message}`);
+    }
+  }
 
   return (
-    <div>
-      <h2>My Allergies</h2>
-      {msg && <div style={{color:'green'}}>{msg}</div>}
-      <ul>
+    <section className="card" aria-labelledby="profile-h">
+      <h2 id="profile-h" className="section-title">My Allergy Profile</h2>
+      <p className="small">Select allergens to avoid. The “Safe for me” filter on the Menu page will use this.</p>
+
+      <div role="group" aria-labelledby="profile-h" style={{display:"grid", gap:8, gridTemplateColumns:"repeat(auto-fill, minmax(180px, 1fr))"}}>
         {allergens.map(a => (
-          <li key={a.id}>
-            <label>
-              <input type="checkbox" checked={sel.has(a.id)} onChange={()=>toggle(a.id)} />
-              {' '}{a.name}
-            </label>
-          </li>
+          <label key={a.id} className="chip">
+            <input
+              type="checkbox"
+              checked={myIds.includes(a.id)}
+              onChange={() => toggle(a.id)}
+            />
+            <span>{a.name}</span>
+          </label>
         ))}
-      </ul>
-      <button onClick={save}>Save</button>
-    </div>
-  )
+      </div>
+
+      <div style={{marginTop:12, display:"flex", gap:8}}>
+        <button className="btn" onClick={save}>Save</button>
+        <button className="btn secondary" onClick={load}>Reload</button>
+      </div>
+
+      {msg && <div role="status" aria-live="polite" className="alert success" style={{marginTop:12}}>{msg}</div>}
+    </section>
+  );
 }

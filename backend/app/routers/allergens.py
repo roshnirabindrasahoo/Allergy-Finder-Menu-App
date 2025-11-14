@@ -30,3 +30,9 @@ def set_my_allergies(payload: AllergySetIn, user=Depends(get_current_user), db: 
         for a in alls: u.allergies.append(a)
     db.commit()
     return {"ok": True}
+
+
+@router.get("/me")
+def get_my_allergens(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    u = db.get(User, user["id"])
+    return {"allergyIds": [a.id for a in u.allergies]}

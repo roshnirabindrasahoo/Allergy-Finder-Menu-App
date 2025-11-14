@@ -1,34 +1,46 @@
-'use client'
-import { useState } from 'react'
-import { api } from '@/lib/api'
-import { setToken } from '@/lib/auth'
-import Link from 'next/link'
+"use client";
+import { useState } from "react";
+import { api } from "@/lib/api";
+import { setToken, clearToken } from "@/lib/auth";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [err, setErr] = useState('')
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [msg, setMsg] = useState({ type: "", text: "" });
 
-  const submit = async (e) => {
-    e.preventDefault()
-    setErr('')
+  async function submit(e) {
+    e.preventDefault();
+    setMsg({type:"", text:""});
     try {
-      const r = await api('/api/auth/login', { method:'POST', body:{ email, password } })
-      setToken(r.token)
-      location.href = '/menu'
-    } catch (e) { setErr(e.message) }
+      const data = await api("/api/auth/login", { method: "POST", body: form });
+      setToken(data.token);
+      setMsg({ type: "success", text: "Logged in. Token saved." });
+    } catch (err) {
+      setMsg({ type: "error", text: err.message });
+    }
   }
 
   return (
-    <div>
-      <h2>Login</h2>
-      {err && <div style={{color:'red'}}>{err}</div>}
-      <form onSubmit={submit}>
-        <div><input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} /></div>
-        <div><input placeholder="Password" type="password" value={password} onChange={e=>setPassword(e.target.value)} /></div>
-        <button>Login</button>
+    <section className="card" aria-labelledby="login-h">
+      <h2 id="login-h" className="section-title">Login</h2>
+      <form onSubmit={submit} noValidate>
+        <label htmlFor="lemail">Email</label>
+        <input id="lemail" className="input" type="email" autoComplete="email" required
+               value={form.email} onChange={e=>setForm({...form, email:e.target.value})} />
+        <label htmlFor="lpass">Password</label>
+        <input id="lpass" className="input" type="password" autoComplete="current-password" required
+               value={form.password} onChange={e=>setForm({...form, password:e.target.value})} />
+        <div style={{display:"flex", gap:8}}>
+          <button className="btn" type="submit">Login</button>
+          <button className="btn secondary" type="button" onClick={()=>{ clearToken(); setMsg({type:"success", text:"Logged out. Token cleared."}); }}>
+            Logout
+          </button>
+        </div>
       </form>
-      <p>New here? <Link href="/register">Create an account</Link></p>
-    </div>
-  )
+      {msg.text && (
+        <div role="status" aria-live="polite" className={`alert ${msg.type === "error" ? "error" : "success"}`} style={{marginTop:12}}>
+          {msg.text}
+        </div>
+      )}
+    </section>
+  );
 }

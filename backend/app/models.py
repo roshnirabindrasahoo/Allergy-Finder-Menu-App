@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal
+from typing import List, Optional
+from sqlalchemy import JSON
 
 from sqlalchemy import (
     Table,
@@ -10,129 +11,141 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    DateTime,
-    Numeric,
+    Float,
     ForeignKey,
+    DateTime,
     UniqueConstraint,
-    func,
+    Index,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from .db import Base
 
-# ---------- Association tables ----------
+# ------------------------------------------------------------
+# Association tables (define BEFORE the ORM classes)
+# ------------------------------------------------------------
 
+# Users ↔ Allergens (a customer can have many allergens; an allergen can belong to many users)
 user_allergies = Table(
     "user_allergies",
     Base.metadata,
     Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
     Column("allergen_id", ForeignKey("allergens.id", ondelete="CASCADE"), primary_key=True),
+    # optional unique/indexes are inherent via the composite primary key
 )
 
-menu_allergens = Table(
-    "menu_allergens",
+# MenuItems ↔ Allergens (a menu item can have many allergens; an allergen can appear on many items)
+menu_item_allergens = Table(
+    "menu_item_allergens",
     Base.metadata,
-    Column("menu_id", ForeignKey("menu_items.id", ondelete="CASCADE"), primary_key=True),
+    Column("menu_item_id", ForeignKey("menu_items.id", ondelete="CASCADE"), primary_key=True),
     Column("allergen_id", ForeignKey("allergens.id", ondelete="CASCADE"), primary_key=True),
-    UniqueConstraint("menu_id", "allergen_id", name="uq_menu_allergen"),
 )
 
-# ---------- Core entities ----------
+# ------------------------------------------------------------
+# ORM models
+# ------------------------------------------------------------
 
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String, nullable=False)
-    email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String, nullable=False)
-    role: Mapped[str] = mapped_column(String, nullable=False)  # 'customer' | 'restaurant' | 'admin'
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), default="customer", nullable=False)  # "customer" | "restaurant"
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
-    allergies: Mapped[list["Allergen"]] = relationship(
-        "Allergen", secondary=user_allergies, back_populates="users"
+    # Allergies selected by the user (customers)
+    allergies: Mapped[List["Allergen"]] = relationship(
+        "Allergen",
+        secondary=user_allergies,
+        back_populates="users",
+        lazy="selectin",
     )
-    menu_items: Mapped[list["MenuItem"]] = relationship(
-        "MenuItem", back_populates="restaurant", cascade="all, delete-orphan"
+
+    # If you want an easy relationship to menu items the restaurant owns:
+    menu_items: Mapped[List["MenuItem"]] = relationship(
+        "MenuItem",
+        back_populates="restaurant",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="selectin",
     )
+
+    __table_args__ = (
+        Index("ix_users_role", "role"),
+    )
+
 
 class Allergen(Base):
     __tablename__ = "allergens"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
 
-    users: Mapped[list["User"]] = relationship(
-        "User", secondary=user_allergies, back_populates="allergies"
+    # Users that have this allergen set
+    users: Mapped[List["User"]] = relationship(
+        "User",
+        secondary=user_allergies,
+        back_populates="allergies",
+        lazy="selectin",
     )
-    menu_items: Mapped[list["MenuItem"]] = relationship(
-        "MenuItem", secondary=menu_allergens, back_populates="allergens"
+
+    # Menu items that include this allergen
+    menu_items: Mapped[List["MenuItem"]] = relationship(
+        "MenuItem",
+        secondary=menu_item_allergens,
+        back_populates="allergens",
+        lazy="selectin",
     )
+
 
 class MenuItem(Base):
     __tablename__ = "menu_items"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    restaurant_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    item_name: Mapped[str] = mapped_column(String, nullable=False)
-    description: Mapped[str] = mapped_column(Text, default="")
-    price: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    item_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    price: Mapped[Optional[float]] = mapped_column(Float)
 
-    restaurant: Mapped["User"] = relationship("User", back_populates="menu_items")
-    allergens: Mapped[list["Allergen"]] = relationship(
-        "Allergen", secondary=menu_allergens, back_populates="menu_items"
+    # Owning restaurant (User with role="restaurant")
+    restaurant: Mapped["User"] = relationship(
+        "User",
+        back_populates="menu_items",
+        lazy="joined",
     )
 
-# ---------- Ingestion (files & parsed rows) ----------
+    # Allergens predicted/assigned for this item
+    allergens: Mapped[List[Allergen]] = relationship(
+        "Allergen",
+        secondary=menu_item_allergens,  # NOTE: variable (not string) so SQLA can resolve it
+        back_populates="menu_items",
+        lazy="selectin",
+    )
 
+    __table_args__ = (
+        # A restaurant should not have two menu items with the exact same name (optional rule—remove if not desired)
+        UniqueConstraint("restaurant_id", "item_name", name="uq_menuitem_restaurant_name"),
+        Index("ix_menu_items_item_name", "item_name"),
+    )
+
+# --- Staging table for uploads awaiting commit ---
 class FileUpload(Base):
-    __tablename__ = "files"
+    __tablename__ = "file_uploads"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    restaurant_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    filename: Mapped[str] = mapped_column(String, nullable=False)
-    filetype: Mapped[str] = mapped_column(String, nullable=False)  # 'csv' | 'pdf'
-    sha256: Mapped[str] = mapped_column(String, index=True, nullable=False)
-    pages: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-
-class ParsedRow(Base):
-    __tablename__ = "parsed_rows"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    file_id: Mapped[int] = mapped_column(ForeignKey("files.id", ondelete="CASCADE"), index=True)
-    row_index: Mapped[int] = mapped_column(Integer)  # 0-based
-    item_name: Mapped[str] = mapped_column(String, default="")
-    description: Mapped[str] = mapped_column(Text, default="")
-    price: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
-    parsing_meta: Mapped[str] = mapped_column(Text, default="")  # optional JSON-as-text
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-
-    __table_args__ = (
-        UniqueConstraint("file_id", "row_index", name="uq_file_row"),
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
+    # list[dict] holding parsed rows (preview), including predicted allergens
+    data_json: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
-# ---------- Predictions (versioned) ----------
+    restaurant: Mapped["User"] = relationship("User", lazy="joined")
 
-class AllergenPrediction(Base):
-    __tablename__ = "allergen_predictions"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    parsed_row_id: Mapped[int | None] = mapped_column(
-        ForeignKey("parsed_rows.id", ondelete="CASCADE"), nullable=True, index=True
-    )
-    menu_item_id: Mapped[int | None] = mapped_column(
-        ForeignKey("menu_items.id", ondelete="CASCADE"), nullable=True, index=True
-    )
-    allergen_id: Mapped[int] = mapped_column(ForeignKey("allergens.id", ondelete="CASCADE"), index=True)
-    score: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
-    status: Mapped[str] = mapped_column(String, nullable=False)  # 'auto' | 'weak' | 'rejected'
-    rules_version: Mapped[str] = mapped_column(String, nullable=False)
-    model_version: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    __table_args__ = (
-        UniqueConstraint("parsed_row_id", "allergen_id", name="uq_row_allergen"),
-        UniqueConstraint("menu_item_id", "allergen_id", name="uq_item_allergen"),
-    )
