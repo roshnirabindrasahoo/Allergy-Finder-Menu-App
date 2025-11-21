@@ -5,7 +5,7 @@ from ..models import User
 from ..schemas import UserCreate, UserLogin, TokenOut
 from ..auth import hash_password, verify_password, create_token
 
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 

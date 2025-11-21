@@ -1,6 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# app/main.py
+from sqlalchemy import text
+from fastapi import Depends
+from .db import get_db
+
 # Ensure models are registered on Base.metadata
 from . import models  # <-- add this line
 
@@ -13,7 +18,7 @@ from .routers import menus as menus_router
 # DB bootstrap
 from .db import Base, engine
 
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
 
 
 app = FastAPI(title="Allergy Menu Finder")
@@ -37,6 +42,13 @@ app.add_middleware(
 @app.get("/api/health")
 def health():
     return {"ok": True}
+
+
+@app.get("/api/health/db")
+def db_health(db=Depends(get_db)):
+    who = db.execute(text("SELECT current_user")).scalar()
+    return {"db": "ok", "current_user": who}
+
 
 # ---- Mount routers ----
 app.include_router(auth_router.router)

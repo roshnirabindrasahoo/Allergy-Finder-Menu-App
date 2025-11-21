@@ -1,0 +1,10 @@
+CREATE ROLE allergy_user WITH LOGIN PASSWORD 'mylocalpw';
+ALTER ROLE allergy_user CREATEDB;
+
+-- Create the database owned by this user
+CREATE DATABASE allergy_menu_db OWNER allergy_user;
+
+-- (Optional) switch in and check
+\c allergy_menu_db
+SELECT current_database(), current_user;
+\q
