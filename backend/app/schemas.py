@@ -13,7 +13,7 @@ class UserCreate(BaseModel):
     name: str
     email: str
     password: str
-    role: str  # customer | restaurant | admin
+    role: str = "customer"  # customer | restaurant | admin (default to customer)
 
 class UserLogin(BaseModel):
     email: str

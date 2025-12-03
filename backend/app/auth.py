@@ -34,7 +34,8 @@ def get_optional_user(
     try:
         return jwt.decode(creds.credentials, SECRET_KEY, algorithms=[ALGO])
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        # In optional contexts, fall back to anonymous on bad/missing token
+        return None
 
 def require_role(role: str):
     def _dep(user=Depends(get_current_user)):

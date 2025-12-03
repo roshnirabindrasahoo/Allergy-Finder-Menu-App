@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 # app/main.py
 from sqlalchemy import text
@@ -37,6 +38,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+def root():
+    # Option A: simple message
+    return JSONResponse({"message": "Allergy Menu Finder API. See /docs for Swagger."})
 
 # ---- Health ----
 @app.get("/api/health")
