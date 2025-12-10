@@ -32,6 +32,7 @@ origins = [
     "http://127.0.0.1:5173",
     "http://localhost:4000",
     "http://127.0.0.1:4000",
+    "https://allergy-finder-menu-app.vercel.app",
 ]
 app.add_middleware(
     CORSMiddleware,
